@@ -1,14 +1,13 @@
 #!/usr/bin/env python3
-"""KaliCMD Academy — Step 7 Part 2.
+"""KaliCMD Academy — Step 8 Part 2.
 
-Connects the Concepts database to the Kivy app.
-Educational use only: run security commands only on systems/labs you own
-or are explicitly authorized to test.
+Adds Practice Labs to the Academy UI.
+Use labs only on your own device, local training VMs, CTFs, or systems
+where you have explicit authorization.
 """
 
 import json
 import os
-import subprocess
 
 from kivy.app import App
 from kivy.uix.screenmanager import ScreenManager, Screen
@@ -19,10 +18,10 @@ from kivy.uix.button import Button
 from kivy.uix.label import Label
 from kivy.uix.textinput import TextInput
 from kivy.uix.popup import Popup
-from kivy.utils import platform
 
 from tools_data import TOOLS
 from concepts_data import CONCEPTS
+from labs_data import LABS
 
 
 def copy_text(text):
@@ -53,7 +52,7 @@ def popup(title_text, message):
     pop.open()
 
 
-def title(text, size=20):
+def make_title(text, size=20):
     return Label(
         text=f"[b]{text}[/b]", markup=True,
         font_size=f"{size}sp", size_hint_y=None, height=48
@@ -66,7 +65,7 @@ class Dashboard(Screen):
         self.app = app
 
         root = BoxLayout(orientation="vertical", padding=10, spacing=8)
-        root.add_widget(title("🎓 KaliCMD Academy", 24))
+        root.add_widget(make_title("🎓 KaliCMD Academy", 24))
         root.add_widget(Label(
             text="Learn Linux • Networking • Cybersecurity",
             size_hint_y=None, height=34
@@ -80,6 +79,8 @@ class Dashboard(Screen):
             ("🎓 Learning Path", "learning"),
             ("📚 Concepts", "concepts"),
             ("🛠 Tools", "tools"),
+            ("🧪 Practice Labs", "labs"),
+            ("🎯 Missions", "missions"),
             ("📈 Progress", "progress"),
             ("⭐ Favorites", "favorites"),
         ]
@@ -97,13 +98,14 @@ class ConceptsScreen(Screen):
     def __init__(self, app, **kwargs):
         super().__init__(**kwargs)
         self.app = app
-
         root = BoxLayout(orientation="vertical", padding=10, spacing=7)
+
         top = BoxLayout(size_hint_y=None, height=50, spacing=6)
         back = Button(text="‹ Back", size_hint_x=.22)
-        back.bind(on_press=lambda *_: setattr(app.sm, "current", "dashboard"))
+        back.bind(on_press=lambda *_:
+                  setattr(app.sm, "current", "dashboard"))
         top.add_widget(back)
-        top.add_widget(title("📚 Concepts", 20))
+        top.add_widget(make_title("📚 Concepts", 20))
         root.add_widget(top)
 
         self.search = TextInput(
@@ -162,14 +164,14 @@ class ConceptDetail(Screen):
     def __init__(self, app, **kwargs):
         super().__init__(**kwargs)
         self.app = app
-
         root = BoxLayout(orientation="vertical", padding=10, spacing=7)
+
         top = BoxLayout(size_hint_y=None, height=50, spacing=6)
         back = Button(text="‹ Concepts", size_hint_x=.25)
         back.bind(on_press=lambda *_:
                   setattr(app.sm, "current", "concepts"))
         top.add_widget(back)
-        self.heading = title("Concept", 19)
+        self.heading = make_title("Concept", 19)
         top.add_widget(self.heading)
         root.add_widget(top)
 
@@ -190,12 +192,11 @@ class ConceptDetail(Screen):
             markup=True, size_hint_y=None, height=70,
             text_size=(420, None), halign="left"
         ))
-        sections = [
+        for heading_text, text in [
             ("What is it?", c["what"]),
             ("Why does it matter?", c["why"]),
             ("Simple example", c["example"]),
-        ]
-        for heading_text, text in sections:
+        ]:
             self.body.add_widget(Label(
                 text=f"[b]{heading_text}[/b]\n{text}",
                 markup=True, size_hint_y=None, height=105,
@@ -203,31 +204,28 @@ class ConceptDetail(Screen):
             ))
 
         self.body.add_widget(Label(
-            text="[b]Related commands[/b]",
-            markup=True, size_hint_y=None, height=38
+            text="[b]Related commands[/b]", markup=True,
+            size_hint_y=None, height=38
         ))
         for cmd in c.get("related_commands", []):
             row = BoxLayout(size_hint_y=None, height=48, spacing=6)
-            row.add_widget(Label(
-                text=cmd, size_hint_x=.78, halign="left"
-            ))
+            row.add_widget(Label(text=cmd, size_hint_x=.78))
             b = Button(text="Copy", size_hint_x=.22)
             b.bind(on_press=lambda _, x=cmd: self.copy(x))
             row.add_widget(b)
             self.body.add_widget(row)
 
         self.body.add_widget(Label(
-            text="[b]Quick Quiz[/b]",
-            markup=True, size_hint_y=None, height=42
+            text="[b]Quick Quiz[/b]", markup=True,
+            size_hint_y=None, height=42
         ))
         for i, q in enumerate(c.get("quiz", []), 1):
             self.add_quiz(i, q)
 
     def copy(self, text):
-        popup(
-            "Copied" if copy_text(text) else "Copy failed",
-            text if copy_text(text) else f"Copy manually:\n{text}"
-        )
+        ok = copy_text(text)
+        popup("Copied" if ok else "Copy failed",
+              text if ok else f"Copy manually:\n{text}")
 
     def add_quiz(self, number, q):
         box = BoxLayout(
@@ -236,15 +234,12 @@ class ConceptDetail(Screen):
         )
         box.add_widget(Label(
             text=f"{number}. {q['q']}",
-            size_hint_y=None, height=48,
-            halign="left"
+            size_hint_y=None, height=48, halign="left"
         ))
         for option in q["options"]:
             b = Button(text=option, size_hint_y=None, height=40)
-            b.bind(
-                on_press=lambda _, selected=option, answer=q["answer"]:
-                    self.quiz_result(selected, answer)
-            )
+            b.bind(on_press=lambda _, selected=option, answer=q["answer"]:
+                    self.quiz_result(selected, answer))
             box.add_widget(b)
         self.body.add_widget(box)
 
@@ -256,17 +251,155 @@ class ConceptDetail(Screen):
             popup("Not quite", f"Correct answer: {answer}")
 
 
-class ToolsScreen(Screen):
+class LabsScreen(Screen):
     def __init__(self, app, **kwargs):
         super().__init__(**kwargs)
         self.app = app
         root = BoxLayout(orientation="vertical", padding=10, spacing=7)
+
         top = BoxLayout(size_hint_y=None, height=50, spacing=6)
         back = Button(text="‹ Back", size_hint_x=.22)
         back.bind(on_press=lambda *_:
                   setattr(app.sm, "current", "dashboard"))
         top.add_widget(back)
-        top.add_widget(title("🛠 Tools", 20))
+        top.add_widget(make_title("🧪 Practice Labs", 20))
+        root.add_widget(top)
+
+        self.search = TextInput(
+            hint_text="Search labs...",
+            multiline=False, size_hint_y=None, height=46
+        )
+        self.search.bind(text=lambda *_: self.rebuild())
+        root.add_widget(self.search)
+
+        self.scroll = ScrollView()
+        self.grid = GridLayout(cols=1, spacing=7, size_hint_y=None)
+        self.grid.bind(minimum_height=self.grid.setter("height"))
+        self.scroll.add_widget(self.grid)
+        root.add_widget(self.scroll)
+        self.add_widget(root)
+
+    def rebuild(self):
+        self.grid.clear_widgets()
+        q = self.search.text.strip().lower()
+
+        for lab in LABS:
+            hay = (
+                lab["title"] + " " + lab["category"] + " " +
+                lab["level"] + " " + lab["objective"]
+            ).lower()
+            if q and q not in hay:
+                continue
+
+            completed = lab["id"] in self.app.completed_labs
+            status = "✅ Completed" if completed else f"⭐ {lab['xp']} XP"
+            b = Button(
+                text=f"{lab['title']}\n"
+                     f"{lab['category']} • {lab['level']} • {status}",
+                size_hint_y=None, height=82
+            )
+            b.bind(on_press=lambda _, data=lab:
+                   self.app.open_lab(data))
+            self.grid.add_widget(b)
+
+        if not self.grid.children:
+            self.grid.add_widget(Label(
+                text="No labs found.", size_hint_y=None, height=50
+            ))
+
+
+class LabDetail(Screen):
+    def __init__(self, app, **kwargs):
+        super().__init__(**kwargs)
+        self.app = app
+        self.lab = None
+
+        root = BoxLayout(orientation="vertical", padding=10, spacing=7)
+        top = BoxLayout(size_hint_y=None, height=50, spacing=6)
+        back = Button(text="‹ Labs", size_hint_x=.25)
+        back.bind(on_press=lambda *_:
+                  setattr(app.sm, "current", "labs"))
+        top.add_widget(back)
+        self.heading = make_title("Lab", 19)
+        top.add_widget(self.heading)
+        root.add_widget(top)
+
+        self.scroll = ScrollView()
+        self.body = BoxLayout(
+            orientation="vertical", size_hint_y=None, spacing=9, padding=5
+        )
+        self.body.bind(minimum_height=self.body.setter("height"))
+        self.scroll.add_widget(self.body)
+        root.add_widget(self.scroll)
+        self.add_widget(root)
+
+    def load(self, lab):
+        self.lab = lab
+        self.body.clear_widgets()
+        done = lab["id"] in self.app.completed_labs
+        self.heading.text = f"[b]{lab['title']}[/b]"
+
+        self.add_text(
+            f"[b]{lab['title']}[/b]\n"
+            f"{lab['category']} • {lab['level']} • {lab['xp']} XP",
+            70
+        )
+        self.add_text(f"[b]Objective[/b]\n{lab['objective']}", 110)
+        self.add_text(f"[b]Scenario[/b]\n{lab['scenario']}", 120)
+
+        self.add_text("[b]Tasks[/b]", 40)
+        for i, task in enumerate(lab["tasks"], 1):
+            self.add_text(f"{i}. {task}", 65)
+
+        self.add_text("[b]Hints[/b]", 40)
+        for i, hint in enumerate(lab["hints"], 1):
+            self.add_text(f"Hint {i}: {hint}", 75)
+
+        self.add_text(
+            f"[b]Expected learning[/b]\n{lab['expected_learning']}", 120
+        )
+        self.add_text(
+            f"[b]Completion criteria[/b]\n{lab['completion']}", 120
+        )
+
+        self.body.add_widget(Button(
+            text="🔄 Mark as Completed" if not done else "✅ Completed",
+            disabled=done, size_hint_y=None, height=58
+        ))
+        button = self.body.children[0]
+        button.bind(on_press=lambda *_: self.complete())
+
+    def add_text(self, text, height):
+        self.body.add_widget(Label(
+            text=text, markup=True, size_hint_y=None, height=height,
+            text_size=(420, None), halign="left", valign="top"
+        ))
+
+    def complete(self):
+        if not self.lab or self.lab["id"] in self.app.completed_labs:
+            return
+        self.app.completed_labs.add(self.lab["id"])
+        self.app.add_xp(self.lab["xp"])
+        self.app.save_state()
+        popup(
+            "Lab completed! 🏆",
+            f"{self.lab['title']}\n\n+{self.lab['xp']} XP"
+        )
+        self.load(self.lab)
+
+
+class ToolsScreen(Screen):
+    def __init__(self, app, **kwargs):
+        super().__init__(**kwargs)
+        self.app = app
+        root = BoxLayout(orientation="vertical", padding=10, spacing=7)
+
+        top = BoxLayout(size_hint_y=None, height=50, spacing=6)
+        back = Button(text="‹ Back", size_hint_x=.22)
+        back.bind(on_press=lambda *_:
+                  setattr(app.sm, "current", "dashboard"))
+        top.add_widget(back)
+        top.add_widget(make_title("🛠 Tools", 20))
         root.add_widget(top)
 
         self.search = TextInput(
@@ -312,29 +445,28 @@ class ProgressScreen(Screen):
         super().__init__(**kwargs)
         self.app = app
         root = BoxLayout(orientation="vertical", padding=10, spacing=8)
+
         top = BoxLayout(size_hint_y=None, height=50)
         back = Button(text="‹ Back", size_hint_x=.22)
         back.bind(on_press=lambda *_:
                   setattr(app.sm, "current", "dashboard"))
         top.add_widget(back)
-        top.add_widget(title("📈 Progress", 20))
+        top.add_widget(make_title("📈 Progress", 20))
         root.add_widget(top)
-        self.info = Label(
-            text="", text_size=(420, None), halign="left",
-            valign="top"
-        )
+
+        self.info = Label(text="", text_size=(420, None), halign="left")
         root.add_widget(self.info)
         self.add_widget(root)
 
     def refresh(self):
+        completed = len(self.app.completed_labs)
         self.info.text = (
             f"[b]KaliCMD Academy Progress[/b]\n\n"
             f"XP: {self.app.xp}\n"
-            f"Concept quiz XP: earned by correct answers\n"
+            f"Practice Labs completed: {completed}/{len(LABS)}\n"
             f"Concepts available: {len(CONCEPTS)}\n"
             f"Tools available: {len(TOOLS)}\n\n"
-            "Next modules will add learning-path completion, "
-            "missions, labs, achievements and streaks."
+            "Keep learning inside authorized labs and practice environments."
         )
         self.info.markup = True
 
@@ -342,15 +474,15 @@ class ProgressScreen(Screen):
 class LearningScreen(Screen):
     def __init__(self, app, **kwargs):
         super().__init__(**kwargs)
-        self.app = app
         root = BoxLayout(orientation="vertical", padding=10, spacing=8)
         top = BoxLayout(size_hint_y=None, height=50)
         back = Button(text="‹ Back", size_hint_x=.22)
         back.bind(on_press=lambda *_:
                   setattr(app.sm, "current", "dashboard"))
         top.add_widget(back)
-        top.add_widget(title("🎓 Learning Path", 20))
+        top.add_widget(make_title("🎓 Learning Path", 20))
         root.add_widget(top)
+
         scroll = ScrollView()
         box = BoxLayout(orientation="vertical", size_hint_y=None, spacing=7)
         box.bind(minimum_height=box.setter("height"))
@@ -366,10 +498,28 @@ class LearningScreen(Screen):
                 size_hint_y=None, height=70
             )
             b.bind(on_press=lambda _, x=item:
-                   popup(x, "This learning path will be connected in the next build."))
+                   popup(x, "This learning path will be connected in a later build."))
             box.add_widget(b)
         scroll.add_widget(box)
         root.add_widget(scroll)
+        self.add_widget(root)
+
+
+class MissionsScreen(Screen):
+    def __init__(self, app, **kwargs):
+        super().__init__(**kwargs)
+        root = BoxLayout(orientation="vertical", padding=10, spacing=8)
+        top = BoxLayout(size_hint_y=None, height=50)
+        back = Button(text="‹ Back", size_hint_x=.22)
+        back.bind(on_press=lambda *_:
+                  setattr(app.sm, "current", "dashboard"))
+        top.add_widget(back)
+        top.add_widget(make_title("🎯 Missions", 20))
+        root.add_widget(top)
+        root.add_widget(Label(
+            text="Missions will combine Concepts + Labs + Tools into guided challenges.",
+            text_size=(420, None), halign="left"
+        ))
         self.add_widget(root)
 
 
@@ -378,6 +528,7 @@ class KaliAcademy(App):
         super().__init__(**kwargs)
         self.xp = 0
         self.favs = set()
+        self.completed_labs = set()
         self.data_file = os.path.join(self.user_data_dir, "academy.json")
         self.load_state()
         self.sm = ScreenManager()
@@ -387,19 +538,31 @@ class KaliAcademy(App):
         self.sm.add_widget(ConceptsScreen(self, name="concepts"))
         self.sm.add_widget(ConceptDetail(self, name="concept-detail"))
         self.sm.add_widget(ToolsScreen(self, name="tools"))
+        self.sm.add_widget(LabsScreen(self, name="labs"))
+        self.sm.add_widget(LabDetail(self, name="lab-detail"))
+        self.sm.add_widget(MissionsScreen(self, name="missions"))
         self.sm.add_widget(ProgressScreen(self, name="progress"))
         self.sm.add_widget(LearningScreen(self, name="learning"))
+
         self.sm.current = "dashboard"
         self.sm.get_screen("concepts").rebuild()
         self.sm.get_screen("tools").rebuild()
+        self.sm.get_screen("labs").rebuild()
         return self.sm
 
     def open_section(self, section):
+        if section == "favorites":
+            popup("Favorites", "Favorites UI will be expanded in a later build.")
+            return
+
         self.sm.current = section
+
         if section == "concepts":
             self.sm.get_screen("concepts").rebuild()
         elif section == "tools":
             self.sm.get_screen("tools").rebuild()
+        elif section == "labs":
+            self.sm.get_screen("labs").rebuild()
         elif section == "progress":
             self.sm.get_screen("progress").refresh()
 
@@ -407,32 +570,6 @@ class KaliAcademy(App):
         self.sm.current = "concept-detail"
         self.sm.get_screen("concept-detail").load(concept)
 
-    def add_xp(self, amount):
-        self.xp += amount
-        self.save_state()
-
-    def load_state(self):
-        try:
-            with open(self.data_file, "r", encoding="utf-8") as f:
-                data = json.load(f)
-            self.xp = int(data.get("xp", 0))
-            self.favs = set(data.get("favorites", []))
-        except Exception:
-            self.xp = 0
-            self.favs = set()
-
-    def save_state(self):
-        try:
-            os.makedirs(os.path.dirname(self.data_file), exist_ok=True)
-            with open(self.data_file, "w", encoding="utf-8") as f:
-                json.dump({
-                    "xp": self.xp,
-                    "favorites": sorted(self.favs),
-                }, f)
-        except Exception:
-            pass
-
-
-if __name__ == "__main__":
-    KaliAcademy().run()
-    
+    def open_lab(self, lab):
+        self.sm.current = "lab-detail"
+        self.sm.get_screen("lab-detail").load(lab)
